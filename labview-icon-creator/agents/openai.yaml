@@ -1,0 +1,4 @@
+interface:
+  display_name: "LabVIEW Icon Creator"
+  short_description: "Create QA-validated LabVIEW VI icon sets"
+  default_prompt: "Use $labview-icon-creator to create five distinct, QA-validated LabVIEW VI icon options for my concept."
