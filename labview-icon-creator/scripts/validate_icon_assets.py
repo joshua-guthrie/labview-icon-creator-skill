@@ -13,10 +13,10 @@ from PIL import Image, ImageChops, ImageStat
 
 try:
     from .naming import parse_asset_filename, validate_option_filenames
-    from .process_icons import ICO_SIZES, MASTER_SIZE, PNG_SIZES
+    from .process_icons import BACKGROUND_MODES, DEFAULT_BACKGROUND_MODE, ICO_SIZES, MASTER_SIZE, PNG_SIZES
 except ImportError:  # Direct script execution.
     from naming import parse_asset_filename, validate_option_filenames
-    from process_icons import ICO_SIZES, MASTER_SIZE, PNG_SIZES
+    from process_icons import BACKGROUND_MODES, DEFAULT_BACKGROUND_MODE, ICO_SIZES, MASTER_SIZE, PNG_SIZES
 
 
 def result(
@@ -80,7 +80,11 @@ def measurable_metrics(image: Image.Image) -> dict[str, float | list[int] | None
     }
 
 
-def validate_png(path: str | Path, expected_size: tuple[int, int]) -> list[dict[str, Any]]:
+def validate_png(
+    path: str | Path,
+    expected_size: tuple[int, int],
+    background_mode: str = DEFAULT_BACKGROUND_MODE,
+) -> list[dict[str, Any]]:
     asset = Path(path)
     checks: list[dict[str, Any]] = []
     if not asset.is_file() or asset.stat().st_size == 0:
@@ -103,12 +107,13 @@ def validate_png(path: str | Path, expected_size: tuple[int, int]) -> list[dict[
                 measured_value=list(image.size),
                 threshold=list(expected_size),
             ))
+            required_mode = "RGB" if background_mode == "white" else "RGBA"
             checks.append(result(
                 "FILE-PNG-004",
-                "PASS" if image.mode == "RGBA" else "FAIL",
-                "PNG has RGBA mode for a transparent outer background",
+                "PASS" if image.mode == required_mode else "FAIL",
+                f"PNG mode matches the declared {background_mode} background",
                 measured_value=image.mode,
-                threshold="RGBA",
+                threshold=required_mode,
             ))
             corners = [
                 rgba.getpixel((0, 0)),
@@ -116,13 +121,17 @@ def validate_png(path: str | Path, expected_size: tuple[int, int]) -> list[dict[
                 rgba.getpixel((0, rgba.height - 1)),
                 rgba.getpixel((rgba.width - 1, rgba.height - 1)),
             ]
-            transparent_corners = all(pixel[3] == 0 for pixel in corners)
+            background_matches = (
+                all(pixel == (255, 255, 255, 255) for pixel in corners)
+                if background_mode == "white"
+                else all(pixel[3] == 0 for pixel in corners)
+            )
             checks.append(result(
                 "FILE-PNG-008",
-                "PASS" if transparent_corners else "FAIL",
-                "PNG outer corners have a transparent background",
+                "PASS" if background_matches else "FAIL",
+                f"PNG outer corners match the declared {background_mode} background",
                 measured_value=[list(pixel) for pixel in corners],
-                threshold="all alpha channels == 0",
+                threshold="all corners == opaque white" if background_mode == "white" else "all alpha channels == 0",
             ))
             metrics = measurable_metrics(image)
             checks.append(result(
@@ -160,7 +169,10 @@ def _ico_sizes(image: Image.Image) -> set[tuple[int, int]]:
     return sizes
 
 
-def validate_ico(path: str | Path) -> list[dict[str, Any]]:
+def validate_ico(
+    path: str | Path,
+    background_mode: str = DEFAULT_BACKGROUND_MODE,
+) -> list[dict[str, Any]]:
     asset = Path(path)
     if not asset.is_file() or asset.stat().st_size == 0:
         return [result("FILE-ICO-001", "FAIL", f"ICO missing or empty: {asset.name}")]
@@ -194,6 +206,7 @@ def validate_ico(path: str | Path) -> list[dict[str, Any]]:
             ))
             ico = getattr(image, "ico", None)
             corrupt: list[list[int]] = []
+            wrong_background: list[list[int]] = []
             if ico is not None and hasattr(ico, "getimage"):
                 for size in sorted(required & available):
                     try:
@@ -201,6 +214,21 @@ def validate_ico(path: str | Path) -> list[dict[str, Any]]:
                         frame.load()
                         if frame.size != size:
                             corrupt.append(list(size))
+                            continue
+                        rgba = frame.convert("RGBA")
+                        corners = [
+                            rgba.getpixel((0, 0)),
+                            rgba.getpixel((rgba.width - 1, 0)),
+                            rgba.getpixel((0, rgba.height - 1)),
+                            rgba.getpixel((rgba.width - 1, rgba.height - 1)),
+                        ]
+                        matches = (
+                            all(pixel == (255, 255, 255, 255) for pixel in corners)
+                            if background_mode == "white"
+                            else all(pixel[3] == 0 for pixel in corners)
+                        )
+                        if not matches:
+                            wrong_background.append(list(size))
                     except Exception:
                         corrupt.append(list(size))
             checks.append(result(
@@ -216,6 +244,13 @@ def validate_ico(path: str | Path) -> list[dict[str, Any]]:
                 "ICO has a valid 256x256 entry",
                 measured_value=(256, 256) in available,
                 threshold=True,
+            ))
+            checks.append(result(
+                "FILE-ICO-008",
+                "PASS" if not wrong_background else "FAIL",
+                f"Required ICO frames match the declared {background_mode} background",
+                measured_value=wrong_background,
+                threshold=f"no frames with a non-{background_mode} outer background",
             ))
     except Exception as exc:
         checks.append(result("FILE-ICO-007", "FAIL", f"ICO cannot be decoded: {exc}"))
@@ -269,6 +304,21 @@ def validate_option_assets(metadata: dict[str, Any], base_dir: str | Path = ".")
     derived = list(metadata["derived_png_files"])
     ico_file = str(metadata["ico_file"])
     filenames = [source_file, *(str(item["file"]) for item in derived), ico_file]
+    declared_background = metadata.get("background_mode")
+    if declared_background is None:
+        legacy_ico_background = str(metadata.get("ico_background", ""))
+        declared_background = "transparent" if legacy_ico_background.startswith("transparent") else DEFAULT_BACKGROUND_MODE
+    background_mode = str(declared_background).lower()
+    valid_background = background_mode in BACKGROUND_MODES
+    checks.append(result(
+        "FILE-BACKGROUND-001",
+        "PASS" if valid_background else "FAIL",
+        "Option declares a supported background mode",
+        measured_value=declared_background,
+        threshold=list(BACKGROUND_MODES),
+    ))
+    if not valid_background:
+        background_mode = DEFAULT_BACKGROUND_MODE
     name_errors = validate_option_filenames(filenames)
     checks.append(result(
         "NAME-OPTION-001",
@@ -298,7 +348,7 @@ def validate_option_assets(metadata: dict[str, Any], base_dir: str | Path = ".")
         measured_value=metadata.get("source_dimensions"),
         threshold=list(MASTER_SIZE),
     ))
-    checks.extend(validate_png(base / source_file, MASTER_SIZE))
+    checks.extend(validate_png(base / source_file, MASTER_SIZE, background_mode))
     required_derivatives = set(PNG_SIZES)
     actual_derivatives = {tuple(item["dimensions"]) for item in derived}
     checks.append(result(
@@ -309,10 +359,10 @@ def validate_option_assets(metadata: dict[str, Any], base_dir: str | Path = ".")
         threshold=[list(size) for size in PNG_SIZES],
     ))
     for item in derived:
-        checks.extend(validate_png(base / str(item["file"]), tuple(item["dimensions"])))
+        checks.extend(validate_png(base / str(item["file"]), tuple(item["dimensions"]), background_mode))
         if "geometry" in item:
             checks.append(validate_proportional_geometry(item["geometry"]))
-    checks.extend(validate_ico(base / ico_file))
+    checks.extend(validate_ico(base / ico_file, background_mode))
     return checks
 
 

@@ -28,16 +28,17 @@ artwork remains safe and readable.
 | `VIS-OCCUPANCY-006` Subject occupancy | Obviously too small to survive or too large for the canvas. The normal target is 55–85%. |
 | `VIS-CONTRAST-007` Contrast | Essential foreground, adjacent shapes, or action cue cannot be clearly separated. |
 | `VIS-GRADIENT-008` Gradient | Gradient or shading materially reduces contrast, obscures required geometry, or introduces small-size noise; antialiasing is allowed. |
-| `VIS-BACKGROUND-009` Background | Outer background is not transparent, or a scene, texture, shadow, or effect reduces clarity. |
+| `VIS-BACKGROUND-009` Background | Outer background does not match the run's declared mode—pure white by default or transparent when requested—or a scene, texture, shadow, halo, or effect reduces clarity. |
 | `VIS-TEXT-010` Text | Unrequested letters, labels, pseudo-text, or prominent text-like artifacts. Requested text is allowed, but fails if it is malformed or too small to be intentionally legible. |
 | `VIS-ARTIFACT-011` Artifacts | Malformed/duplicate geometry, debris, halos, corruption, or broken generated shapes. |
 | `VIS-DISTINCT-012` Cross-option distinctness | Candidate substantially duplicates an accepted option; replace at least one. |
 
 ## Small-size rules
 
-Create temporary previews at native 29×29, 30×23, 30×18, and 16×16. Use
-`scripts/preview_sheet.py` to include native previews and 10×–16× nearest-neighbor
-enlargements. Never use the sheet as source artwork.
+Create temporary previews at native 29×29, 30×23, 30×18, and 16×16 on the
+selected final background. Use `scripts/preview_sheet.py --background white` by
+default or `--background transparent` when requested to include native previews
+and 10×–16× nearest-neighbor enlargements. Never use the sheet as source artwork.
 
 | Rule | Mandatory failure condition |
 |---|---|

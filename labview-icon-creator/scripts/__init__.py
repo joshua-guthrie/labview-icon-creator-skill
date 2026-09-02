@@ -1,3 +1,3 @@
 """Deterministic helpers for the LabVIEW Icon Creator skill."""
 
-SKILL_VERSION = "1.0.0"
+SKILL_VERSION = "1.1.0"

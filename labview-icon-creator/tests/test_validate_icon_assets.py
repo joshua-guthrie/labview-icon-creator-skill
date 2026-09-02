@@ -30,7 +30,7 @@ class ValidationTests(unittest.TestCase):
             self.assertIn("FILE-PNG-005", failed_rules)
             self.assertIn("NAME-PNG-001", failed_rules)
 
-    def test_opaque_background_png_fails_transparency_checks(self) -> None:
+    def test_opaque_background_png_fails_when_transparency_is_declared(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "Opaque option 1 29x29 a1b2c3d4e5.png"
             image = Image.new("RGB", (29, 29), "white")
@@ -38,9 +38,21 @@ class ValidationTests(unittest.TestCase):
                 for y in range(8, 21):
                     image.putpixel((x, y), (20, 90, 180))
             image.save(path)
-            checks = validate_png(path, (29, 29))
+            checks = validate_png(path, (29, 29), "transparent")
             failed_rules = {check["rule_id"] for check in checks if check["result"] == "FAIL"}
             self.assertIn("FILE-PNG-004", failed_rules)
+            self.assertIn("FILE-PNG-008", failed_rules)
+
+    def test_nonwhite_outer_corner_fails_when_white_is_declared(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Tinted option 1 29x29 a1b2c3d4e5.png"
+            image = Image.new("RGB", (29, 29), (250, 250, 245))
+            for x in range(8, 21):
+                for y in range(8, 21):
+                    image.putpixel((x, y), (20, 90, 180))
+            image.save(path)
+            checks = validate_png(path, (29, 29), "white")
+            failed_rules = {check["rule_id"] for check in checks if check["result"] == "FAIL"}
             self.assertIn("FILE-PNG-008", failed_rules)
 
     def test_metrics_report_margin_occupancy_and_contrast(self) -> None:

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from support import SKILL_ROOT  # noqa: F401
-from scripts.lessons_learned import write_lessons_learned
+from scripts.lessons_learned import generalized_lessons, write_lessons_learned
 
 
 class LessonsLearnedTests(unittest.TestCase):
@@ -43,7 +43,8 @@ class LessonsLearnedTests(unittest.TestCase):
             for heading in (
                 "# LabVIEW Icon Creator — Lessons Learned",
                 "## Run Metadata",
-                "## Problems Encountered",
+                "## Incident Evidence",
+                "## Generalized Lessons",
                 "SMALL-ACTION-006",
                 "The plus disappeared at 30x18.",
                 "### Script Changes",
@@ -52,6 +53,31 @@ class LessonsLearnedTests(unittest.TestCase):
                 "## Codex Implementation Request",
             ):
                 self.assertIn(heading, text)
+
+    def test_distinctness_incident_is_generalized_without_overfitting(self) -> None:
+        incident = {
+            "option_number": 5,
+            "concept_id": "database-cylinder-to-disk",
+            "qa_stage": "visual",
+            "rule_id": "VIS-DISTINCT-012",
+            "result": "FAIL",
+            "observed_problem": "The HDF5 database cylinder duplicated another option.",
+        }
+        lesson = generalized_lessons([incident])[0]
+        reusable_spec = " ".join(
+            [
+                lesson["failure_mode"],
+                *lesson["recurrence_conditions"],
+                *lesson["prevention_requirements"],
+                *lesson["detection_requirements"],
+                *lesson["recovery_requirements"],
+            ]
+        ).lower()
+        self.assertNotIn("hdf5", reusable_spec)
+        self.assertNotIn("database", reusable_spec)
+        self.assertIn("primary metaphor", reusable_spec)
+        self.assertIn("composition", reusable_spec)
+        self.assertIs(lesson["incidents"][0], incident)
 
 
 if __name__ == "__main__":

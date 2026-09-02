@@ -21,6 +21,7 @@ class ManifestTests(unittest.TestCase):
             self.assertEqual(len(document["options"]), 1)
             option = document["options"][0]
             self.assertEqual(option["salt"], "a1b2c3d4e5")
+            self.assertEqual(option["background_mode"], "white")
             self.assertEqual(len(option["sha256"]), 5)
             source_path = root / option["source_file"]
             self.assertEqual(option["sha256"][option["source_file"]], hashlib.sha256(source_path.read_bytes()).hexdigest())

@@ -5,8 +5,9 @@ Read this reference before planning or generating concepts.
 ## Design target
 
 The 1024×1024 source is a master; judge the design for 18–30 pixel use. Unless
-the user explicitly overrides the style, use a transparent background, high
-contrast, clean centered geometry, and generous margins. Color count, flat
+the user explicitly requests transparency, use a pure white background, high
+contrast, clean centered geometry, and generous margins. A transparent
+background is fully supported as an explicit alternative. Color count, flat
 versus shaded treatment, and use of gradients are flexible as long as they do
 not reduce recognition at small sizes. Avoid decorative border, texture, scene,
 shadow, photographic treatment, or incidental effects.
@@ -28,6 +29,21 @@ Minor color, stroke, or positioning variants of the same drawing are not
 distinct. Useful approaches include object-plus-action, object-plus-status,
 simplified metaphor, alternate orientation, and an equivalent standard symbol.
 
+Before generation, summarize each plan with a compact visual signature:
+
+- primary metaphor;
+- principal objects;
+- action or status cue;
+- composition;
+- orientation.
+
+Compare the five signatures pairwise. Replace a plan when its primary metaphor
+and structural composition substantially overlap another plan. Different names,
+colors, rendering styles, strokes, or minor positions do not make overlapping
+structures distinct. After generation, repeat the comparison against every
+accepted candidate; pixel similarity alone cannot establish semantic or
+structural distinctness.
+
 Before generation, replace a concept when it:
 
 - needs more than three primary ideas, small text, or fine detail;
@@ -47,6 +63,14 @@ or multiple alternatives in one image, and never crop such an image into source
 assets.
 
 Prompt for complete centered artwork with roughly 8–12% clear margin (5% is a
-practical lower bound), strong foreground/background separation, a transparent
-outer background, and no incidental letters or labels. The principal artwork
-should generally occupy 55–85% of the useful canvas width or height.
+practical lower bound), strong foreground/background separation, and no
+incidental letters or labels. For the default mode, request a uniform pure-white
+outer background with no texture, shadow, border, or scene. When transparency
+was requested, request a transparent outer background instead. The principal
+artwork should generally occupy 55–85% of the useful canvas width or height.
+
+Background mode is a final-output contract, not a reason to redesign the icon.
+Processing isolates the artwork, resamples it with LANCZOS, and then applies the
+selected background. Applying white after resampling preserves smooth edge
+coverage and avoids dark halos in reduced icons. Use one background mode for all
+accepted options in a run unless the user explicitly asks for multiple sets.

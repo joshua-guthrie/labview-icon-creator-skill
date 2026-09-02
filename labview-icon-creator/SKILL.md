@@ -8,7 +8,9 @@ description: Generate five distinct, QA-validated LabVIEW VI icon options from a
 Create practical software icons whose real design target is 18–30 pixels. The
 normal result is five independently generated and accepted source PNGs, three
 resized PNGs and one ICO per option, plus `manifest.json`, all written directly
-to the user's current working directory. Do not create a ZIP unless requested.
+to the user's current working directory. Final files use a white background by
+default; use transparent backgrounds when the user requests them. Do not create
+a ZIP unless requested.
 
 ## Preflight
 
@@ -26,19 +28,25 @@ unconvertible images while claiming completion.
 ## Run workflow
 
 1. Read [references/style-guide.md](references/style-guide.md), then interpret
-   the request. Ask a question only when ambiguity or conflicting constraints
-   would materially change the icons.
+   the request and select one final background mode for the set: `white` by
+   default or `transparent` when requested. Ask a question only when ambiguity
+   or conflicting constraints would materially change the icons.
 2. Derive a two-to-five-word `summaryName` and normalize it with
    `scripts/naming.py`. Plan exactly five meaningfully different concepts for
-   the same function. Reject weak or duplicate concepts before generation;
-   preflight rejections do not count as QA failures.
+   the same function. Give each plan a compact visual signature covering its
+   primary metaphor, principal objects, action/status cue, composition, and
+   orientation. Compare signatures pairwise and reject weak or structurally
+   duplicate concepts before generation; preflight rejections do not count as
+   QA failures.
 3. Create a temporary working directory. Generate every candidate as its own
    full-resolution square raster image—normally 1024×1024 PNG. Never generate
    a grid, montage, contact sheet, or other multi-option source image.
 4. Read [references/qa-guide.md](references/qa-guide.md). Inspect every generated
-   source and scripted 29×29, 30×23, 30×18, and 16×16 preview. Record explicit
-   `PASS`, `FAIL`, `WARN`, or `N/A` results. A mandatory `FAIL` rejects the
-   candidate; do not weaken a rule to finish the run.
+   source and scripted 29×29, 30×23, 30×18, and 16×16 preview on the selected
+   final background. Compare every candidate with all accepted options for
+   structural and metaphorical distinctness. Record explicit `PASS`, `FAIL`,
+   `WARN`, or `N/A` results. A mandatory `FAIL` rejects the candidate; do not
+   weaken a rule to finish the run.
 5. Give a planned concept at most three generated attempts. After three failed
    attempts, retire it and plan a different visual approach. Stop generation at
    20 total candidates. Record each post-generation, processing, or final-file
@@ -49,7 +57,8 @@ unconvertible images while claiming completion.
    full-size and small-size visual QA. Reuse that salt for all files belonging
    to the accepted option. Do not assign final salts to rejected candidates.
 7. Read [references/naming-and-output.md](references/naming-and-output.md). Run
-   `scripts/process_icons.py` for each accepted source. Run
+   `scripts/process_icons.py` for each accepted source with the selected
+   background mode. Run
    `scripts/validate_icon_assets.py` before presenting any deliverable. Keep
    rejected sources, transient previews, and raw QA logs in the temporary area.
 8. Use `scripts/manifest.py` to write `manifest.json` containing only accepted

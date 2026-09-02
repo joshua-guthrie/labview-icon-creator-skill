@@ -19,6 +19,8 @@ except ImportError:  # Direct script execution.
 MASTER_SIZE = (1024, 1024)
 PNG_SIZES = ((29, 29), (30, 23), (30, 18))
 ICO_SIZES = ((16, 16), (20, 20), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256))
+BACKGROUND_MODES = ("white", "transparent")
+DEFAULT_BACKGROUND_MODE = "white"
 
 
 def open_source(path: str | Path) -> Image.Image:
@@ -35,11 +37,31 @@ def open_source(path: str | Path) -> Image.Image:
 
 
 def normalize_master(image: Image.Image) -> Image.Image:
-    # Accept legacy white-backed sources, but keep the final master transparent.
+    # Processing uses one transparent artwork layer. The selected final
+    # background is applied only after each size is resampled.
     transparent, _ = remove_outer_white(image)
     if transparent.size == MASTER_SIZE:
         return transparent
     return transparent.resize(MASTER_SIZE, Image.Resampling.LANCZOS)
+
+
+def validate_background_mode(background_mode: str) -> str:
+    mode = str(background_mode).strip().lower()
+    if mode not in BACKGROUND_MODES:
+        raise ValueError(f"background mode must be one of: {', '.join(BACKGROUND_MODES)}")
+    return mode
+
+
+def apply_background(image: Image.Image, background_mode: str) -> Image.Image:
+    """Apply the final background after resizing to preserve antialiased edges."""
+
+    mode = validate_background_mode(background_mode)
+    rgba = image.convert("RGBA")
+    if mode == "transparent":
+        return rgba
+    white = Image.new("RGB", rgba.size, "white")
+    white.paste(rgba.convert("RGB"), mask=rgba.getchannel("A"))
+    return white
 
 
 def foreground_bbox(image: Image.Image, tolerance: int = 12) -> tuple[int, int, int, int] | None:
@@ -128,17 +150,9 @@ def remove_outer_white(image: Image.Image, threshold: int = 238) -> tuple[Image.
     return result, True
 
 
-def create_ico(master: Image.Image, destination: Path) -> bool:
-    transparent, transparency_applied = remove_outer_white(master)
-    transparent.save(destination, format="ICO", sizes=list(ICO_SIZES), bitmap_format="png")
-    # A source may already be transparent, in which case no removal was needed.
-    corner_alpha = [
-        transparent.getpixel((0, 0))[3],
-        transparent.getpixel((transparent.width - 1, 0))[3],
-        transparent.getpixel((0, transparent.height - 1))[3],
-        transparent.getpixel((transparent.width - 1, transparent.height - 1))[3],
-    ]
-    return transparency_applied or any(alpha == 0 for alpha in corner_alpha)
+def create_ico(master: Image.Image, destination: Path, background_mode: str) -> None:
+    rendered = apply_background(master, background_mode)
+    rendered.save(destination, format="ICO", sizes=list(ICO_SIZES), bitmap_format="png")
 
 
 def process_icon(
@@ -148,14 +162,16 @@ def process_icon(
     salt: str | None = None,
     output_dir: str | Path = ".",
     concept_summary: str = "",
+    background_mode: str = DEFAULT_BACKGROUND_MODE,
 ) -> dict[str, Any]:
     """Process one visually accepted source and return manifest-ready metadata."""
 
     summary_name = sanitize_summary_name(summary_name)
+    background_mode = validate_background_mode(background_mode)
     permanent_salt = salt or generate_salt()
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    master = normalize_master(open_source(source))
+    master_artwork = normalize_master(open_source(source))
 
     source_name = png_filename(summary_name, option_number, *MASTER_SIZE, permanent_salt)
     png_names = [png_filename(summary_name, option_number, *size, permanent_salt) for size in PNG_SIZES]
@@ -168,12 +184,12 @@ def process_icon(
     derivatives: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="labview-icon-process-", dir=output) as temporary:
         staging = Path(temporary)
-        master.save(staging / source_name, format="PNG", optimize=True)
+        apply_background(master_artwork, background_mode).save(staging / source_name, format="PNG", optimize=True)
         for size, name in zip(PNG_SIZES, png_names):
-            derivative, geometry = fit_artwork(master, size)
-            derivative.save(staging / name, format="PNG", optimize=True)
+            derivative, geometry = fit_artwork(master_artwork, size)
+            apply_background(derivative, background_mode).save(staging / name, format="PNG", optimize=True)
             derivatives.append({"file": name, "dimensions": list(size), "geometry": geometry})
-        transparency_applied = create_ico(master, staging / ico_name)
+        create_ico(master_artwork, staging / ico_name, background_mode)
 
         for name in [source_name, *png_names, ico_name]:
             staged = staging / name
@@ -185,10 +201,11 @@ def process_icon(
             "salt": permanent_salt,
             "source_file": source_name,
             "source_dimensions": list(MASTER_SIZE),
+            "background_mode": background_mode,
             "derived_png_files": derivatives,
             "ico_file": ico_name,
             "ico_sizes": [list(size) for size in ICO_SIZES],
-            "ico_background": "transparent_outer_background" if transparency_applied else "white_background_retained",
+            "ico_background": f"{background_mode}_background",
             "qa_status": "PASS",
         }
         try:
@@ -212,6 +229,12 @@ def main() -> int:
     parser.add_argument("--option", type=int, required=True)
     parser.add_argument("--salt", help="accepted option's permanent 10-character salt")
     parser.add_argument("--concept-summary", default="")
+    parser.add_argument(
+        "--background",
+        choices=BACKGROUND_MODES,
+        default=DEFAULT_BACKGROUND_MODE,
+        help="final PNG/ICO background (default: white)",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path.cwd())
     parser.add_argument("--metadata", type=Path, help="optional JSON metadata destination")
     args = parser.parse_args()
@@ -223,6 +246,7 @@ def main() -> int:
         args.salt,
         args.output_dir,
         args.concept_summary,
+        args.background,
     )
     encoded = json.dumps(metadata, indent=2)
     if args.metadata:

@@ -22,8 +22,8 @@ letters/digits for each option and reuse it across that option's files.
 
 For every accepted option, `process_icons.py` creates:
 
-- a 1024×1024 source PNG with a transparent outer background;
-- exact 29×29, 30×23, and 30×18 PNG canvases with transparent outer backgrounds;
+- a 1024×1024 source PNG with the selected outer background;
+- exact 29×29, 30×23, and 30×18 PNG canvases with the selected outer background;
 - one true ICO containing 16, 20, 24, 32, 40, 48, 64, 128, and 256 pixel frames.
 
 The script fits proportionally, centers, uses LANCZOS, never stretches, crops,
@@ -31,20 +31,28 @@ or independently redraws derivatives. A different generator size may normalize
 to 1024×1024 only when it is square; reject a non-square source rather than
 distorting it.
 
-For ICO artwork, the processor removes only border-connected near-white pixels
-when that operation passes conservative safety checks. This preserves enclosed
-white foreground. Foreground integrity takes priority over transparency. New
-accepted sources should already have transparent outer pixels, and a
-non-transparent outer background is a validation failure.
+The background mode is `white` by default and `transparent` when requested. The
+processor first isolates artwork by removing only border-connected near-white
+source pixels when conservative safety checks pass; this preserves enclosed
+white foreground. It resamples the isolated RGBA artwork before applying the
+final background. White files are saved as opaque RGB with exact-white outer
+corners; transparent files are saved as RGBA with zero-alpha outer corners. ICO
+frames use the same selected background. Foreground integrity takes priority
+over background removal.
+
+Use `--background white` or `--background transparent` on
+`scripts/process_icons.py`. Omitting the option selects white. Record
+`background_mode` in option metadata and `manifest.json`.
 
 ## Validation and final directory
 
 Run `validate_icon_assets.py` to confirm each PNG exists, is nonempty, opens as
-PNG, has dimensions matching its filename, has expected canvas/mode, is not
-blank, and retains proportional artwork. Confirm each ICO is nonempty, opens as
-ICO, contains all required frames including a valid 256×256 frame, and is not a
-renamed PNG. Validate summary names, option numbers, salt form/reuse/uniqueness,
-and Windows filename safety.
+PNG, has dimensions matching its filename, has the declared background and
+canvas/mode, is not blank, and retains proportional artwork. Confirm each ICO
+is nonempty, opens as ICO, contains all required frames including a valid
+256×256 frame, uses the declared background, and is not a renamed PNG. Validate
+summary names, option numbers, salt form/reuse/uniqueness, and Windows filename
+safety.
 
 Write accepted files and `manifest.json` directly in the run's current working
 directory. `manifest.json` contains only accepted options and includes run ID,
