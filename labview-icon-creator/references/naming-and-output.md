@@ -22,8 +22,8 @@ letters/digits for each option and reuse it across that option's files.
 
 For every accepted option, `process_icons.py` creates:
 
-- a 1024×1024 white-background source PNG;
-- exact 29×29, 30×23, and 30×18 white-background PNG canvases;
+- a 1024×1024 source PNG with a transparent outer background;
+- exact 29×29, 30×23, and 30×18 PNG canvases with transparent outer backgrounds;
 - one true ICO containing 16, 20, 24, 32, 40, 48, 64, 128, and 256 pixel frames.
 
 The script fits proportionally, centers, uses LANCZOS, never stretches, crops,
@@ -33,8 +33,9 @@ distorting it.
 
 For ICO artwork, the processor removes only border-connected near-white pixels
 when that operation passes conservative safety checks. This preserves enclosed
-white foreground. It retains a white background when safe automatic removal is
-not possible; foreground integrity takes priority over transparency.
+white foreground. Foreground integrity takes priority over transparency. New
+accepted sources should already have transparent outer pixels, and a
+non-transparent outer background is a validation failure.
 
 ## Validation and final directory
 

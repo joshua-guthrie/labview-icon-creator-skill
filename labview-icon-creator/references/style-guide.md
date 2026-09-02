@@ -5,10 +5,15 @@ Read this reference before planning or generating concepts.
 ## Design target
 
 The 1024×1024 source is a master; judge the design for 18–30 pixel use. Unless
-the user explicitly overrides the style, use a white background, flat fills,
-high contrast, clean centered geometry, generous margins, and no decorative
-border, texture, scene, shadow, photographic treatment, or intentional gradient.
-Do not include text or pseudo-text unless the requested meaning requires it.
+the user explicitly overrides the style, use a transparent background, high
+contrast, clean centered geometry, and generous margins. Color count, flat
+versus shaded treatment, and use of gradients are flexible as long as they do
+not reduce recognition at small sizes. Avoid decorative border, texture, scene,
+shadow, photographic treatment, or incidental effects.
+Short text is allowed when requested, but treat it as icon geometry: use at
+most three or four large, high-contrast characters, with a simple typeface and
+enough spacing to remain readable at every required output size. Never use
+small labels, pseudo-text, or decorative lettering.
 
 Build each concept from one dominant idea and normally two or three primary
 elements. Prefer strong silhouettes, thick features, clear separation, and
@@ -42,6 +47,6 @@ or multiple alternatives in one image, and never crop such an image into source
 assets.
 
 Prompt for complete centered artwork with roughly 8–12% clear margin (5% is a
-practical lower bound), strong foreground/background separation, simple solid
-geometry, and no incidental letters or labels. The principal artwork should
-generally occupy 55–85% of the useful canvas width or height.
+practical lower bound), strong foreground/background separation, a transparent
+outer background, and no incidental letters or labels. The principal artwork
+should generally occupy 55–85% of the useful canvas width or height.

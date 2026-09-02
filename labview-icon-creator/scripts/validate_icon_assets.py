@@ -39,6 +39,8 @@ def result(
 
 
 def _foreground_mask(image: Image.Image, tolerance: int = 12) -> Image.Image:
+    if "A" in image.getbands():
+        return image.getchannel("A").point(lambda value: 255 if value > tolerance else 0)
     rgb = image.convert("RGB")
     background = Image.new("RGB", rgb.size, rgb.getpixel((0, 0)))
     difference = ImageChops.difference(rgb, background).convert("L")
@@ -46,8 +48,9 @@ def _foreground_mask(image: Image.Image, tolerance: int = 12) -> Image.Image:
 
 
 def measurable_metrics(image: Image.Image) -> dict[str, float | list[int] | None]:
-    rgb = image.convert("RGB")
-    mask = _foreground_mask(rgb)
+    rgba = image.convert("RGBA")
+    rgb = rgba.convert("RGB")
+    mask = _foreground_mask(image)
     bbox = mask.getbbox()
     if bbox is None:
         return {
@@ -85,6 +88,7 @@ def validate_png(path: str | Path, expected_size: tuple[int, int]) -> list[dict[
     try:
         with Image.open(asset) as image:
             image.load()
+            rgba = image.convert("RGBA")
             checks.append(result(
                 "FILE-PNG-002",
                 "PASS" if image.format == "PNG" else "FAIL",
@@ -101,25 +105,24 @@ def validate_png(path: str | Path, expected_size: tuple[int, int]) -> list[dict[
             ))
             checks.append(result(
                 "FILE-PNG-004",
-                "PASS" if image.mode == "RGB" else "FAIL",
-                "PNG has the expected opaque white-background mode",
+                "PASS" if image.mode == "RGBA" else "FAIL",
+                "PNG has RGBA mode for a transparent outer background",
                 measured_value=image.mode,
-                threshold="RGB",
+                threshold="RGBA",
             ))
-            rgb = image.convert("RGB")
             corners = [
-                rgb.getpixel((0, 0)),
-                rgb.getpixel((rgb.width - 1, 0)),
-                rgb.getpixel((0, rgb.height - 1)),
-                rgb.getpixel((rgb.width - 1, rgb.height - 1)),
+                rgba.getpixel((0, 0)),
+                rgba.getpixel((rgba.width - 1, 0)),
+                rgba.getpixel((0, rgba.height - 1)),
+                rgba.getpixel((rgba.width - 1, rgba.height - 1)),
             ]
-            white_corners = all(min(pixel) >= 245 and max(pixel) - min(pixel) <= 10 for pixel in corners)
+            transparent_corners = all(pixel[3] == 0 for pixel in corners)
             checks.append(result(
                 "FILE-PNG-008",
-                "PASS" if white_corners else "FAIL",
-                "PNG outer corners have the intended white background",
+                "PASS" if transparent_corners else "FAIL",
+                "PNG outer corners have a transparent background",
                 measured_value=[list(pixel) for pixel in corners],
-                threshold="all channels >=245 with <=10 spread",
+                threshold="all alpha channels == 0",
             ))
             metrics = measurable_metrics(image)
             checks.append(result(

@@ -27,9 +27,9 @@ artwork remains safe and readable.
 | `VIS-MARGIN-005` Edge clearance | Important artwork is cramped, touches an edge, or risks clipping. A safely readable borderline metric may be `WARN`. |
 | `VIS-OCCUPANCY-006` Subject occupancy | Obviously too small to survive or too large for the canvas. The normal target is 55–85%. |
 | `VIS-CONTRAST-007` Contrast | Essential foreground, adjacent shapes, or action cue cannot be clearly separated. |
-| `VIS-GRADIENT-008` Gradient | Unrequested broad gradient or shaded fill materially appears; antialiasing is allowed. |
-| `VIS-BACKGROUND-009` Background | Unrequested color, scene, texture, or clarity-reducing shadow/effect. |
-| `VIS-TEXT-010` Text | Unrequested letters, labels, pseudo-text, or prominent text-like artifacts. |
+| `VIS-GRADIENT-008` Gradient | Gradient or shading materially reduces contrast, obscures required geometry, or introduces small-size noise; antialiasing is allowed. |
+| `VIS-BACKGROUND-009` Background | Outer background is not transparent, or a scene, texture, shadow, or effect reduces clarity. |
+| `VIS-TEXT-010` Text | Unrequested letters, labels, pseudo-text, or prominent text-like artifacts. Requested text is allowed, but fails if it is malformed or too small to be intentionally legible. |
 | `VIS-ARTIFACT-011` Artifacts | Malformed/duplicate geometry, debris, halos, corruption, or broken generated shapes. |
 | `VIS-DISTINCT-012` Cross-option distinctness | Candidate substantially duplicates an accepted option; replace at least one. |
 
@@ -47,6 +47,7 @@ enlargements. Never use the sheet as source artwork.
 | `SMALL-SHAPE-004` Shape separation | Required elements merge and alter meaning. |
 | `SMALL-CROWD-005` Pixel crowding | Reduced icon is muddy, noisy, or excessively crowded. |
 | `SMALL-ACTION-006` Action survival | A required action/status symbol disappears or becomes ambiguous. |
+| `SMALL-TEXT-007` Text legibility | Requested text becomes unreadable, merges, or changes character identity at any required size. |
 
 ## Failure handling and log
 

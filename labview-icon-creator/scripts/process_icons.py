@@ -19,7 +19,6 @@ except ImportError:  # Direct script execution.
 MASTER_SIZE = (1024, 1024)
 PNG_SIZES = ((29, 29), (30, 23), (30, 18))
 ICO_SIZES = ((16, 16), (20, 20), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256))
-WHITE = (255, 255, 255, 255)
 
 
 def open_source(path: str | Path) -> Image.Image:
@@ -35,26 +34,19 @@ def open_source(path: str | Path) -> Image.Image:
         return image.convert("RGBA")
 
 
-def flatten_on_white(image: Image.Image) -> Image.Image:
-    canvas = Image.new("RGBA", image.size, WHITE)
-    canvas.alpha_composite(image.convert("RGBA"))
-    return canvas.convert("RGB")
-
-
 def normalize_master(image: Image.Image) -> Image.Image:
-    flattened = flatten_on_white(image)
-    if flattened.size == MASTER_SIZE:
-        return flattened
-    return flattened.resize(MASTER_SIZE, Image.Resampling.LANCZOS)
+    # Accept legacy white-backed sources, but keep the final master transparent.
+    transparent, _ = remove_outer_white(image)
+    if transparent.size == MASTER_SIZE:
+        return transparent
+    return transparent.resize(MASTER_SIZE, Image.Resampling.LANCZOS)
 
 
 def foreground_bbox(image: Image.Image, tolerance: int = 12) -> tuple[int, int, int, int] | None:
     """Estimate non-background artwork bounds against the top-left background."""
 
-    rgb = image.convert("RGB")
-    background = Image.new("RGB", rgb.size, rgb.getpixel((0, 0)))
-    difference = ImageChops.difference(rgb, background).convert("L")
-    mask = difference.point(lambda value: 255 if value > tolerance else 0)
+    alpha = image.convert("RGBA").getchannel("A")
+    mask = alpha.point(lambda value: 255 if value > tolerance else 0)
     return mask.getbbox()
 
 
@@ -63,7 +55,7 @@ def fit_artwork(
     target_size: tuple[int, int],
     margin_pixels: int = 1,
 ) -> tuple[Image.Image, dict[str, Any]]:
-    """Fit detected artwork proportionally into an exact white canvas."""
+    """Fit detected artwork proportionally into an exact transparent canvas."""
 
     bbox = foreground_bbox(master)
     if bbox is None:
@@ -75,9 +67,9 @@ def fit_artwork(
     width = max(1, min(available_width, round(artwork.width * scale)))
     height = max(1, min(available_height, round(artwork.height * scale)))
     resized = artwork.resize((width, height), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", target_size, (255, 255, 255))
+    canvas = Image.new("RGBA", target_size, (0, 0, 0, 0))
     offset = ((target_size[0] - width) // 2, (target_size[1] - height) // 2)
-    canvas.paste(resized, offset)
+    canvas.alpha_composite(resized, offset)
     return canvas, {
         "source_artwork_bbox": list(bbox),
         "source_artwork_size": [artwork.width, artwork.height],
@@ -139,7 +131,14 @@ def remove_outer_white(image: Image.Image, threshold: int = 238) -> tuple[Image.
 def create_ico(master: Image.Image, destination: Path) -> bool:
     transparent, transparency_applied = remove_outer_white(master)
     transparent.save(destination, format="ICO", sizes=list(ICO_SIZES), bitmap_format="png")
-    return transparency_applied
+    # A source may already be transparent, in which case no removal was needed.
+    corner_alpha = [
+        transparent.getpixel((0, 0))[3],
+        transparent.getpixel((transparent.width - 1, 0))[3],
+        transparent.getpixel((0, transparent.height - 1))[3],
+        transparent.getpixel((transparent.width - 1, transparent.height - 1))[3],
+    ]
+    return transparency_applied or any(alpha == 0 for alpha in corner_alpha)
 
 
 def process_icon(

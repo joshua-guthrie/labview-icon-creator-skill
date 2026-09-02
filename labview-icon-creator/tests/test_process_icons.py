@@ -21,7 +21,8 @@ class ProcessIconTests(unittest.TestCase):
             for item, expected in zip(metadata["derived_png_files"], PNG_SIZES):
                 with Image.open(root / item["file"]) as image:
                     self.assertEqual(image.size, expected)
-                    self.assertEqual(image.getpixel((0, 0)), (255, 255, 255))
+                    self.assertEqual(image.mode, "RGBA")
+                    self.assertEqual(image.getpixel((0, 0))[3], 0)
                 geometry = item["geometry"]
                 source_width, source_height = geometry["source_artwork_size"]
                 rendered_width, rendered_height = geometry["rendered_artwork_size"]
