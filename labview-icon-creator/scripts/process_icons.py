@@ -155,6 +155,30 @@ def create_ico(master: Image.Image, destination: Path, background_mode: str) -> 
     rendered.save(destination, format="ICO", sizes=list(ICO_SIZES), bitmap_format="png")
 
 
+def publish_staged_files(staging: Path, output: Path, names: list[str]) -> None:
+    """Publish a validated option as one rollback-safe file set.
+
+    Validation happens before this function is called. If a filesystem error
+    occurs while replacing one of the final paths, remove only the files from
+    this publication attempt so a partial option is never left behind.
+    """
+
+    published: list[Path] = []
+    try:
+        for name in names:
+            staged = staging / name
+            destination = output / name
+            staged.replace(destination)
+            published.append(destination)
+    except Exception:
+        for destination in published:
+            try:
+                destination.unlink()
+            except FileNotFoundError:
+                pass
+        raise
+
+
 def process_icon(
     source: str | Path,
     summary_name: str,
@@ -182,7 +206,10 @@ def process_icon(
         raise FileExistsError("refusing to overwrite existing deliverables: " + ", ".join(existing))
 
     derivatives: list[dict[str, Any]] = []
-    with tempfile.TemporaryDirectory(prefix="labview-icon-process-", dir=output) as temporary:
+    # Stage in the OS temporary area rather than beneath output. The final
+    # directory may allow file writes while denying creation of nested
+    # directories under a managed sandbox.
+    with tempfile.TemporaryDirectory(prefix="labview-icon-process-") as temporary:
         staging = Path(temporary)
         apply_background(master_artwork, background_mode).save(staging / source_name, format="PNG", optimize=True)
         for size, name in zip(PNG_SIZES, png_names):
@@ -216,8 +243,7 @@ def process_icon(
         if has_failures(staged_checks):
             failed_rules = sorted({check["rule_id"] for check in staged_checks if check["result"] == "FAIL"})
             raise RuntimeError("staged asset validation failed: " + ", ".join(failed_rules))
-        for name in [source_name, *png_names, ico_name]:
-            (staging / name).replace(output / name)
+        publish_staged_files(staging, output, [source_name, *png_names, ico_name])
 
     return metadata
 

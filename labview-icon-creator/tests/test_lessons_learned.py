@@ -39,7 +39,7 @@ class LessonsLearnedTests(unittest.TestCase):
             destination = write_lessons_learned(records, directory, {"python_version": "3.x"}, "k7m2p9x4qa")
             self.assertEqual(destination.name, "lessonsLearned k7m2p9x4qa.md")
             self.assertEqual(len(list(Path(directory).glob("lessonsLearned *.md"))), 1)
-            text = destination.read_text()
+            text = destination.read_text(encoding="utf-8")
             for heading in (
                 "# LabVIEW Icon Creator — Lessons Learned",
                 "## Run Metadata",

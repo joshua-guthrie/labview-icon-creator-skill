@@ -40,6 +40,15 @@ corners; transparent files are saved as RGBA with zero-alpha outer corners. ICO
 frames use the same selected background. Foreground integrity takes priority
 over background removal.
 
+Processing uses an OS temporary directory outside the final output directory.
+It validates every staged PNG, the proportional geometry metadata, and every
+required ICO frame before publishing. Publication is rollback-safe: if a
+filesystem error occurs after one final file is moved, files created by that
+attempt are removed and the accepted source is not regenerated. A permission
+failure is an operational staging/publication failure, not a visual QA failure;
+retry the unchanged accepted source only after approved filesystem access is
+available.
+
 Use `--background white` or `--background transparent` on
 `scripts/process_icons.py`. Omitting the option selects white. Record
 `background_mode` in option metadata and `manifest.json`.

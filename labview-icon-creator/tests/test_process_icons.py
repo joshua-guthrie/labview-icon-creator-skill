@@ -3,12 +3,13 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
 
 from support import SKILL_ROOT, create_source  # noqa: F401
-from scripts.preview_sheet import create_contact_sheet
-from scripts.process_icons import ICO_SIZES, PNG_SIZES, process_icon, remove_outer_white
+from scripts.preview_sheet import create_contact_sheet, validate_source_paths
+from scripts.process_icons import ICO_SIZES, PNG_SIZES, process_icon, publish_staged_files, remove_outer_white
 
 
 class ProcessIconTests(unittest.TestCase):
@@ -93,6 +94,59 @@ class ProcessIconTests(unittest.TestCase):
                 self.assertGreater(image.width, 1000)
                 self.assertGreater(image.height, 200)
 
+    def test_processing_stages_outside_output_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            real_temporary_directory = tempfile.TemporaryDirectory
+            with patch("scripts.process_icons.tempfile.TemporaryDirectory") as factory:
+                factory.side_effect = lambda *args, **kwargs: real_temporary_directory(*args, **kwargs)
+                process_icon(create_source(root / "source.png"), "Staged", 1, "a1b2c3d4e5", root)
+            self.assertNotIn("dir", factory.call_args.kwargs)
+
+    def test_staged_validation_failure_publishes_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch(
+                "scripts.validate_icon_assets.validate_option_assets",
+                return_value=[{"rule_id": "PROCESS-GEOMETRY-001", "result": "FAIL"}],
+            ), patch("scripts.validate_icon_assets.has_failures", return_value=True):
+                with self.assertRaisesRegex(RuntimeError, "PROCESS-GEOMETRY-001"):
+                    process_icon(create_source(root / "source.png"), "Rejected", 1, "a1b2c3d4e5", root)
+            self.assertEqual(list(root.glob("Rejected option *")), [])
+
+    def test_partial_publication_rolls_back_created_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            output = root / "output"
+            staging.mkdir()
+            output.mkdir()
+            names = ["one.txt", "two.txt", "three.txt"]
+            for name in names:
+                (staging / name).write_text(name, encoding="utf-8")
+            real_replace = Path.replace
+            calls = 0
+
+            def fail_on_second_replace(path: Path, destination: Path) -> Path:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("simulated publication failure")
+                return real_replace(path, destination)
+
+            with patch.object(Path, "replace", new=fail_on_second_replace):
+                with self.assertRaisesRegex(OSError, "simulated publication failure"):
+                    publish_staged_files(staging, output, names)
+            self.assertEqual(list(output.iterdir()), [])
+
+    def test_preview_sources_must_be_explicit_existing_distinct_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = create_source(Path(directory) / "source.png")
+            self.assertEqual(validate_source_paths([source]), [source.resolve()])
+            with self.assertRaisesRegex(ValueError, "does not exist"):
+                validate_source_paths([Path(directory) / "missing.png"])
+            with self.assertRaisesRegex(ValueError, "distinct"):
+                validate_source_paths([source, source])
 
 if __name__ == "__main__":
     unittest.main()

@@ -41,6 +41,10 @@ unconvertible images while claiming completion.
 3. Create a temporary working directory. Generate every candidate as its own
    full-resolution square raster image—normally 1024×1024 PNG. Never generate
    a grid, montage, contact sheet, or other multi-option source image.
+   When building a QA sheet, pass each accepted candidate as an explicit,
+   already-resolved --source path to scripts/preview_sheet.py; validate
+   that every path exists before invoking it. Do not construct source names
+   with shell-specific inline expressions or inferred attempt suffixes.
 4. Read [references/qa-guide.md](references/qa-guide.md). Inspect every generated
    source and scripted 29×29, 30×23, 30×18, and 16×16 preview on the selected
    final background. Compare every candidate with all accepted options for
@@ -57,9 +61,14 @@ unconvertible images while claiming completion.
    full-size and small-size visual QA. Reuse that salt for all files belonging
    to the accepted option. Do not assign final salts to rejected candidates.
 7. Read [references/naming-and-output.md](references/naming-and-output.md). Run
-   `scripts/process_icons.py` for each accepted source with the selected
-   background mode. Run
-   `scripts/validate_icon_assets.py` before presenting any deliverable. Keep
+   scripts/process_icons.py for each accepted source with the selected
+   background mode. Processing must stage all files outside the final output
+   directory, validate geometry and every decodable ICO frame, and publish only
+   after those checks pass. If staging or publication is denied by the
+   filesystem, record PROCESS-STAGING-002, retry the unchanged accepted source
+   only after approved filesystem access is available, and never regenerate
+   artwork to conceal a deterministic processing failure. Run
+   scripts/validate_icon_assets.py before presenting any deliverable. Keep
    rejected sources, transient previews, and raw QA logs in the temporary area.
 8. Use `scripts/manifest.py` to write `manifest.json` containing only accepted
    options and SHA-256 hashes. If any qualifying failure occurred, read
@@ -77,5 +86,7 @@ lessons-learned report, and do not claim full success.
 
 Run helpers from this skill directory or use their absolute paths. Their CLI
 help documents arguments. The default output directory is the caller's current
-working directory. Treat script validation as complementary to—not a
-replacement for—visual inspection.
+working directory. Processing is a staged, rollback-safe publication: final
+paths are untouched until every staged PNG and ICO contract passes, and a
+publication error removes only files created by that attempt. Treat script
+validation as complementary to—not a replacement for—visual inspection.

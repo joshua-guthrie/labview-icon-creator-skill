@@ -70,3 +70,16 @@ corrective_instruction, retry_result
 Qualifying `FAIL` stages are generated-source visual QA, small-size visual QA,
 scripted processing, final PNG validation, and final ICO validation. A concept
 preflight rejection does not qualify.
+
+## Deterministic processing rules
+
+| Rule | Mandatory failure condition |
+|---|---|
+| PROCESS-PREVIEW-001 — Explicit preview sources | A preview sheet is invoked with a missing, duplicated, inferred, or shell-constructed source path. Pass only explicit existing candidate files. |
+| PROCESS-GEOMETRY-001 — Geometry integrity | Any derivative is non-proportional, cropped, off-canvas, or not centered within the stated tolerance. |
+| PROCESS-STAGING-002 — Staged publication | Staging cannot be created, a staged asset fails validation, an ICO frame cannot be decoded, or publication leaves a partial option. Final paths must remain untouched until staged validation passes. |
+
+A staging or publication permission error is reported with its observed path and
+filesystem exception. Retry the unchanged accepted source after approved access
+is available; do not regenerate accepted artwork for a deterministic processing
+failure.

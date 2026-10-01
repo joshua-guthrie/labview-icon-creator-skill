@@ -8,7 +8,7 @@ from PIL import Image
 
 from support import SKILL_ROOT, create_source  # noqa: F401
 from scripts.process_icons import process_icon
-from scripts.validate_icon_assets import has_failures, measurable_metrics, validate_option_assets, validate_png
+from scripts.validate_icon_assets import has_failures, measurable_metrics, validate_ico, validate_option_assets, validate_png, validate_proportional_geometry
 
 
 class ValidationTests(unittest.TestCase):
@@ -64,6 +64,33 @@ class ValidationTests(unittest.TestCase):
             self.assertGreater(metrics["minimum_edge_margin_fraction"], 0.1)
             self.assertGreater(metrics["contrast_span"], 20)
 
+    def test_malformed_geometry_is_a_structured_failure(self) -> None:
+        check = validate_proportional_geometry({
+            "source_artwork_size": [100, 100],
+            "rendered_artwork_size": [50, 50],
+            "canvas_size": [30, 18],
+            "offset": [0, 0],
+        })
+        self.assertEqual(check["rule_id"], "PROCESS-GEOMETRY-001")
+        self.assertEqual(check["result"], "FAIL")
+        self.assertIn("centered", check["threshold"])
+
+    def test_corrupt_ico_fails_decoding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Corrupt option 1 a1b2c3d4e5.ico"
+            path.write_bytes(b"\x00\x00\x01\x00\x01\x00\x00\x00")
+            checks = validate_ico(path, "white")
+            failed_rules = {check["rule_id"] for check in checks if check["result"] == "FAIL"}
+            self.assertIn("FILE-ICO-007", failed_rules)
+
+    def test_incomplete_ico_fails_frame_completeness_and_decoding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Incomplete option 1 a1b2c3d4e5.ico"
+            Image.new("RGB", (16, 16), "white").save(path, format="ICO", sizes=[(16, 16)])
+            checks = validate_ico(path, "white")
+            failed_rules = {check["rule_id"] for check in checks if check["result"] == "FAIL"}
+            self.assertIn("FILE-ICO-004", failed_rules)
+            self.assertIn("FILE-ICO-005", failed_rules)
 
 if __name__ == "__main__":
     unittest.main()

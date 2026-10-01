@@ -206,8 +206,11 @@ def validate_ico(
             ))
             ico = getattr(image, "ico", None)
             corrupt: list[list[int]] = []
+            missing_decoders: list[list[int]] = [list(size) for size in sorted(required - available)]
             wrong_background: list[list[int]] = []
-            if ico is not None and hasattr(ico, "getimage"):
+            if ico is None or not hasattr(ico, "getimage"):
+                corrupt = [list(size) for size in sorted(required)]
+            else:
                 for size in sorted(required & available):
                     try:
                         frame = ico.getimage(size)
@@ -233,10 +236,10 @@ def validate_ico(
                         corrupt.append(list(size))
             checks.append(result(
                 "FILE-ICO-005",
-                "PASS" if not corrupt else "FAIL",
+                "PASS" if not corrupt and not missing_decoders else "FAIL",
                 "Required ICO frames decode at their declared sizes",
-                measured_value=corrupt,
-                threshold="no corrupt frames",
+                measured_value={"corrupt": corrupt, "missing": missing_decoders},
+                threshold="every required frame decodes",
             ))
             checks.append(result(
                 "FILE-ICO-006",
@@ -265,34 +268,47 @@ def validate_ico(
 
 
 def validate_proportional_geometry(geometry: dict[str, Any]) -> dict[str, Any]:
-    source_width, source_height = geometry["source_artwork_size"]
-    rendered_width, rendered_height = geometry["rendered_artwork_size"]
-    width_scale = rendered_width / source_width
-    height_scale = rendered_height / source_height
-    tolerance = max(1 / source_width, 1 / source_height) + 0.02
-    proportional = math.isclose(width_scale, height_scale, abs_tol=tolerance)
-    canvas_width, canvas_height = geometry["canvas_size"]
-    offset_x, offset_y = geometry["offset"]
-    uncropped = (
-        offset_x >= 0
-        and offset_y >= 0
-        and offset_x + rendered_width <= canvas_width
-        and offset_y + rendered_height <= canvas_height
-    )
-    centered = abs((canvas_width - rendered_width) / 2 - offset_x) <= 1 and abs(
-        (canvas_height - rendered_height) / 2 - offset_y
-    ) <= 1
-    return result(
-        "PROCESS-GEOMETRY-001",
-        "PASS" if proportional and uncropped and centered else "FAIL",
-        "Artwork scaling is proportional, centered, and uncropped",
-        measured_value={
+    try:
+        source_width, source_height = geometry["source_artwork_size"]
+        rendered_width, rendered_height = geometry["rendered_artwork_size"]
+        canvas_width, canvas_height = geometry["canvas_size"]
+        offset_x, offset_y = geometry["offset"]
+        values = (
+            source_width, source_height, rendered_width, rendered_height,
+            canvas_width, canvas_height, offset_x, offset_y,
+        )
+        if any(value <= 0 for value in values[:6]):
+            raise ValueError("geometry dimensions must be positive")
+        width_scale = rendered_width / source_width
+        height_scale = rendered_height / source_height
+        tolerance = max(1 / source_width, 1 / source_height) + 0.02
+        proportional = math.isclose(width_scale, height_scale, abs_tol=tolerance)
+        uncropped = (
+            offset_x >= 0
+            and offset_y >= 0
+            and offset_x + rendered_width <= canvas_width
+            and offset_y + rendered_height <= canvas_height
+        )
+        centered = abs((canvas_width - rendered_width) / 2 - offset_x) <= 1 and abs(
+            (canvas_height - rendered_height) / 2 - offset_y
+        ) <= 1
+        measured = {
             "width_scale": width_scale,
             "height_scale": height_scale,
             "offset": [offset_x, offset_y],
             "uncropped": uncropped,
             "centered": centered,
-        },
+        }
+        valid = proportional and uncropped and centered
+    except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
+        measured = {"error": str(exc)}
+        tolerance = "valid positive dimensions and complete geometry"
+        valid = False
+    return result(
+        "PROCESS-GEOMETRY-001",
+        "PASS" if valid else "FAIL",
+        "Artwork scaling is proportional, centered, and uncropped",
+        measured_value=measured,
         threshold={"scale_difference_max": tolerance, "uncropped": True, "centered": True},
     )
 

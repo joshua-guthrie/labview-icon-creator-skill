@@ -31,6 +31,18 @@ except ImportError:  # Direct script execution.
 PREVIEW_SIZES = ((29, 29), (30, 23), (30, 18), (16, 16))
 
 
+def validate_source_paths(sources: Iterable[str | Path]) -> list[Path]:
+    """Resolve explicit preview sources and reject missing or duplicate paths."""
+
+    resolved = [Path(source).expanduser().resolve() for source in sources]
+    missing = [str(path) for path in resolved if not path.is_file()]
+    if missing:
+        raise ValueError("preview source does not exist or is not a file: " + ", ".join(missing))
+    if len(set(resolved)) != len(resolved):
+        raise ValueError("preview sources must be distinct explicit files")
+    return resolved
+
+
 def create_contact_sheet(
     candidates: Iterable[dict[str, str]],
     output: str | Path,
@@ -102,9 +114,13 @@ def main() -> int:
     labels = args.label or []
     if labels and len(labels) != len(args.source):
         parser.error("--label count must match --source count")
+    try:
+        sources = validate_source_paths(args.source)
+    except ValueError as exc:
+        parser.error(str(exc))
     candidates = [
         {"source": str(source), "label": labels[index] if labels else f"Candidate {index + 1}"}
-        for index, source in enumerate(args.source)
+        for index, source in enumerate(sources)
     ]
     print(create_contact_sheet(candidates, args.output, args.magnification, args.background))
     return 0
