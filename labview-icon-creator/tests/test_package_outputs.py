@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import tempfile
 import unittest
 from pathlib import Path
 
 from support import SKILL_ROOT, create_source  # noqa: F401
+from scripts.workspace import temporary_directory
 from scripts.manifest import write_manifest
 from scripts.process_icons import process_icon
 from scripts.validate_icon_assets import has_failures, validate_package
@@ -12,7 +12,7 @@ from scripts.validate_icon_assets import has_failures, validate_package
 
 class PackageOutputTests(unittest.TestCase):
     def test_five_options_produce_exactly_25_icon_files_without_zip(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             root = Path(directory)
             options = []
             for number in range(1, 6):

@@ -1,56 +1,19 @@
-# Lessons-learned guide
+# Failure reporting
 
-Read this reference only after a generated image, processing step, or final
-file has failed, or the 20-candidate limit prevents five accepted options.
+Normal runs create one compact lessons report from observed qualifying failures;
+concept planning rejections and WARN-only reviews create none. The runner handles
+this automatically. Read this reference only for reporting issues or a requested
+detailed improvement specification.
 
-Use `scripts/lessons_learned.py` with the run's JSONL failure log. Create exactly
-one `lessonsLearned [10-character salt].md` for the run when at least one
-qualifying `FAIL` exists. Create none when there were only concept-preflight
-rejections, `WARN`, `PASS`, or `N/A` results.
+Record candidate/option/concept/attempt, failed stage and stable rule, actual
+size, visible symptom or exception, proposed correction, and retry outcome when
+known. Missing information stays unavailable. Do not copy identical evidence
+across unrelated candidates or invent root causes. Processing and encoding
+failures require deterministic recovery with the accepted source, not new art.
 
-## Purpose
-
-A lessons-learned file is both an incident record and a reusable improvement
-specification. Preserve the run-specific facts as evidence, but do not turn a
-particular subject, icon metaphor, filename, or retry into a universal rule.
-Generalize each incident into the class of failure that allowed it, the
-conditions under which similar failures can recur, and controls that apply to
-future requests in any subject domain.
-
-For example, a database-cylinder/arrow/disk duplicate is evidence for the
-general failure mode "differently named concepts can converge on the same
-visual metaphor and composition." The reusable prevention rule should compare
-concepts by visual structure; it should not require future prompts or reference
-documentation to mention databases or HDF5.
-
-## Required report content
-
-The report must contain two clearly separated layers:
-
-1. **Incident evidence:** option, concept, attempt, QA stage, rule ID,
-   observable behavior/evidence, concise cause hypothesis, corrective action,
-   and retry outcome. This layer may be specific to the run.
-2. **Generalized lesson and implementation specification:**
-   - failure mode stated without request-specific nouns;
-   - recurrence conditions;
-   - prevention requirements;
-   - detection requirements;
-   - recovery requirements;
-   - focused changes for `SKILL.md`, references, scripts, tests, and prompts;
-   - regression-test setup, action, and expected result;
-   - acceptance criteria that are observable and do not weaken existing QA.
-
-Use a run incident as a labeled example of the generalized lesson, never as the
-scope of the lesson itself. Recommendations such as "prevent the observed
-defect," "add the failed pattern," or "document this example" are incomplete
-unless they also say what class of defect to prevent, where the control belongs,
-and how a future implementation or test can determine success.
-
-When a control cannot be automated reliably, specify a structured visual or
-semantic review. Do not propose pixel similarity as a substitute for evaluating
-metaphor, composition, recognition, or meaning. Never invent missing metadata
-such as a Git commit or image-generation backend, and treat cause statements as
-testable hypotheses rather than hidden model reasoning.
-
-End with a Codex implementation request requiring focused updates, preserved
-unrelated behavior, new regression coverage, and the complete test suite.
+The compact report preserves individual incidents and groups generalized lessons
+by rule. It is evidence for later review, not an instruction to modify the skill
+or run development tests during icon production. `lessons_learned.py --detailed`
+retains the full implementation-specification format for an explicitly requested
+improvement task. Such changes require the appropriate deterministic regressions,
+structured visual scenarios where automation is unsuitable, and the test suite.

@@ -1,92 +1,62 @@
 ---
 name: labview-icon-creator
-description: Generate five distinct, QA-validated LabVIEW VI icon options from a short concept, with exact-size PNG derivatives, multi-resolution Windows ICO files, a manifest, and failure-driven lessons learned. Use for LabVIEW icon artwork or LabVIEW VI icon-set requests; do not use for general illustrations or vector-only logo work.
+description: Generate five distinct, visually validated LabVIEW VI icon options, exact-size PNGs, Windows ICOs, and a manifest. Use for LabVIEW VI icon artwork; exclude general illustrations and vector-only logo work.
 ---
 
 # LabVIEW Icon Creator
 
-Create practical software icons whose real design target is 18–30 pixels. The
-normal result is five independently generated and accepted source PNGs, three
-resized PNGs and one ICO per option, plus `manifest.json`, all written directly
-to the user's current working directory. Final files use a white background by
-default; use transparent backgrounds when the user requests them. Do not create
-a ZIP unless requested.
+Design for 18–30 pixel use. Deliver five independent square raster sources,
+29×29, 30×23, and 30×18 PNGs, and nine-frame ICOs (25 icon files), with hashes
+and visual-QA provenance in a manifest. Use white backgrounds unless transparency
+is requested. Write accepted files directly to the user's output directory;
+create no ZIP unless requested.
 
-## Preflight
+## Workflow
 
-Before image generation:
+1. Confirm image generation and vision tools are available. Resolve a working
+   Python with Pillow once per run; prefer the available interpreter or bundled
+   runtime rather than repeatedly trying `python3` aliases. The runner records
+   that executable and its versions. Stop if a required capability is absent.
+2. Read [style-guide.md](references/style-guide.md). Interpret the function and
+   plan five structurally different concepts with compact visual signatures.
+   Compare all five before generating. Design essential cues for 30×18 first.
+3. Read [runtime.md](references/runtime.md) for the batch CLI and generation
+   adapter. Initialize one owned workspace outside final output. Generate one
+   independent square PNG per candidate, normally 1024×1024; never crop a grid
+   or montage. Use the adapter with at most two concurrent generations when
+   supported (one otherwise). Use existing artifact paths or its tested stdin
+   transport; preserve successful results after transport failures.
+4. Read [qa-guide.md](references/qa-guide.md). Inspect full-size sources and one
+   batch sheet of native/magnified previews. Apply the size-specific criteria,
+   record concise candidate-specific evidence, and compare the accepted set for
+   distinctness once. Scripts cannot establish meaning or semantic uniqueness.
+5. Regenerate only visual failures with evidence-based corrections. Keep each
+   attempt in a separate file: at most three per concept, then retire that
+   concept; at most 20 generated candidates overall. Reuse accepted art for all
+   processing, encoding, staging, and permission failures. Stop and report an
+   unresolved operational failure instead of regenerating artwork to hide it.
+6. Record reviews and finalize through the batch runner. It assigns salts after
+   visual acceptance, stages and validates all assets, writes the manifest and
+   any compact lessons report, and publishes with rollback on errors. It refuses
+   missing visual evidence, changed reviewed sources, and stale distinctness
+   reviews. Read [naming-and-output.md](references/naming-and-output.md) only for
+   custom naming, legacy single-option commands, or an output-contract problem.
+7. Return the accepted options with short concept summaries and file links. Keep
+   stdout concise; inspect full diagnostics only for a failure or audit. At the
+   20-candidate limit, finalize compliant options using `--allow-shortfall` and
+   state the exact shortfall. Clean only the runner-owned temporary workspace
+   after successful publication; preserve earlier icon sets and other files.
 
-1. Confirm an independent raster image-generation tool is callable.
-2. Confirm generated images can be visually inspected with image/vision tools.
-3. Run `python3 -c "import PIL; print(PIL.__version__)"` and confirm Python 3 and
-   Pillow are available.
+## Efficiency and continuity
 
-If any capability is absent, stop before generation and name the missing
-capability. Do not substitute text-only concepts, placeholders, ASCII art, or
-unconvertible images while claiming completion.
+Keep revisions of one set in its run. For an unrelated set in a long chat,
+recommend a fresh chat with the request, relevant preferences, and necessary
+references; do not create or message another chat without user authorization.
+Cache capability checks and adapter source during a run. Do not reread scripts,
+print every passing check, recreate transport code, or run development tests
+while producing icons. The test suite is for changes to this skill.
 
-## Run workflow
-
-1. Read [references/style-guide.md](references/style-guide.md), then interpret
-   the request and select one final background mode for the set: `white` by
-   default or `transparent` when requested. Ask a question only when ambiguity
-   or conflicting constraints would materially change the icons.
-2. Derive a two-to-five-word `summaryName` and normalize it with
-   `scripts/naming.py`. Plan exactly five meaningfully different concepts for
-   the same function. Give each plan a compact visual signature covering its
-   primary metaphor, principal objects, action/status cue, composition, and
-   orientation. Compare signatures pairwise and reject weak or structurally
-   duplicate concepts before generation; preflight rejections do not count as
-   QA failures.
-3. Create a temporary working directory. Generate every candidate as its own
-   full-resolution square raster image—normally 1024×1024 PNG. Never generate
-   a grid, montage, contact sheet, or other multi-option source image.
-   When building a QA sheet, pass each accepted candidate as an explicit,
-   already-resolved --source path to scripts/preview_sheet.py; validate
-   that every path exists before invoking it. Do not construct source names
-   with shell-specific inline expressions or inferred attempt suffixes.
-4. Read [references/qa-guide.md](references/qa-guide.md). Inspect every generated
-   source and scripted 29×29, 30×23, 30×18, and 16×16 preview on the selected
-   final background. Compare every candidate with all accepted options for
-   structural and metaphorical distinctness. Record explicit `PASS`, `FAIL`,
-   `WARN`, or `N/A` results. A mandatory `FAIL` rejects the candidate; do not
-   weaken a rule to finish the run.
-5. Give a planned concept at most three generated attempts. After three failed
-   attempts, retire it and plan a different visual approach. Stop generation at
-   20 total candidates. Record each post-generation, processing, or final-file
-   failure as JSON Lines using the fields in the QA guide. Use corrective
-   prompts based only on observed defects and regenerate only the affected
-   concept.
-6. Assign a unique permanent ten-character salt only after a source passes
-   full-size and small-size visual QA. Reuse that salt for all files belonging
-   to the accepted option. Do not assign final salts to rejected candidates.
-7. Read [references/naming-and-output.md](references/naming-and-output.md). Run
-   scripts/process_icons.py for each accepted source with the selected
-   background mode. Processing must stage all files outside the final output
-   directory, validate geometry and every decodable ICO frame, and publish only
-   after those checks pass. If staging or publication is denied by the
-   filesystem, record PROCESS-STAGING-002, retry the unchanged accepted source
-   only after approved filesystem access is available, and never regenerate
-   artwork to conceal a deterministic processing failure. Run
-   scripts/validate_icon_assets.py before presenting any deliverable. Keep
-   rejected sources, transient previews, and raw QA logs in the temporary area.
-8. Use `scripts/manifest.py` to write `manifest.json` containing only accepted
-   options and SHA-256 hashes. If any qualifying failure occurred, read
-   [references/lessons-learned-guide.md](references/lessons-learned-guide.md)
-   and run `scripts/lessons_learned.py`; otherwise create no lessons file.
-9. Remove disposable temporary artifacts. Present only accepted options with a
-   short concept summary and links to their files. Do not expose internal logs
-   unless requested.
-
-If the 20-candidate limit is reached before five options pass, return the
-compliant options already completed, state the exact shortfall, create the
-lessons-learned report, and do not claim full success.
-
-## Script conventions
-
-Run helpers from this skill directory or use their absolute paths. Their CLI
-help documents arguments. The default output directory is the caller's current
-working directory. Processing is a staged, rollback-safe publication: final
-paths are untouched until every staged PNG and ICO contract passes, and a
-publication error removes only files created by that attempt. Treat script
-validation as complementary to—not a replacement for—visual inspection.
+Failure reports are generated from recorded observations. Read
+[lessons-learned-guide.md](references/lessons-learned-guide.md) only for a
+reporting problem or an explicitly requested detailed improvement specification.
+Do not treat a generated report as instructions to modify this skill.

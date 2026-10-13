@@ -5,8 +5,10 @@ Automated metrics support but never replace visual inspection.
 
 ## Result model
 
-Every applicable check has a stable ID, severity, description, result, observed
-evidence, and—when measurable—a value and threshold. Results are:
+Review every applicable rule below. Store concise grouped assessments per source
+and size through the runner, with candidate-specific visible evidence. Failed
+checks identify the exact stable rule, size, symptom, and correction; do not
+copy a generic failure description across different candidates. Results are:
 
 - `PASS`: requirement satisfied.
 - `FAIL`: mandatory requirement not satisfied; reject the candidate.
@@ -35,10 +37,21 @@ artwork remains safe and readable.
 
 ## Small-size rules
 
-Create temporary previews at native 29×29, 30×23, 30×18, and 16×16 on the
-selected final background. Use `scripts/preview_sheet.py --background white` by
-default or `--background transparent` when requested to include native previews
-and 10×–16× nearest-neighbor enlargements. Never use the sheet as source artwork.
+The 29×29, 30×23, and 30×18 PNGs must communicate the requested function,
+including every essential object, action, and output distinction. The 16×16 ICO
+frame is a stress review: its dominant silhouette and primary action must remain
+recognizable. Loss of secondary output detail is acceptable there. Apply
+SMALL-LINE/SHAPE/CROWD/ACTION/TEXT at 16×16 only when the lost cue changes that
+dominant meaning, reverses the action, or violates an explicit user requirement
+for 16×16. Secondary-detail loss alone is PASS or WARN, never a retry trigger.
+Record which cue is essential before judging a candidate; do not silently demand
+full functional detail in the stress frame. Requested text must remain legible
+at required PNG sizes; require 16×16 text legibility only when explicitly needed.
+
+
+Create one temporary sheet at native 29×29, 30×23, 30×18, and 16×16 on the
+selected final background. The batch runner uses the same renderer as the final assets, including the
+16×16 ICO frame, with native previews and 10×–16× nearest-neighbor enlargements. Never use the sheet as source artwork.
 
 | Rule | Mandatory failure condition |
 |---|---|
@@ -79,7 +92,8 @@ preflight rejection does not qualify.
 | PROCESS-GEOMETRY-001 — Geometry integrity | Any derivative is non-proportional, cropped, off-canvas, or not centered within the stated tolerance. |
 | PROCESS-STAGING-002 — Staged publication | Staging cannot be created, a staged asset fails validation, an ICO frame cannot be decoded, or publication leaves a partial option. Final paths must remain untouched until staged validation passes. |
 
-A staging or publication permission error is reported with its observed path and
-filesystem exception. Retry the unchanged accepted source after approved access
-is available; do not regenerate accepted artwork for a deterministic processing
-failure.
+Every processing, encoding, validation, or permission failure belongs to the
+deterministic layer. Preserve the visually accepted source and retry processing
+after correcting the observed cause or resolving access. Exact-white ICO corners
+are enforced during frame rendering; increasing generated-art margins is not an
+encoding repair. Report unresolved errors without consuming further generations.

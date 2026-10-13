@@ -1,71 +1,48 @@
-# Naming, processing, and output
+# Output contract and legacy commands
 
-Read this reference after an image passes source and small-size visual QA.
+Read for custom naming, output-contract diagnosis, or single-option processing.
+Normal runs use `run_icons.py`; it owns names, salts, validation, and publication.
 
-## Names and salts
+## Required assets
 
-Derive a concise, human-readable, preferably Title Case `summaryName` of roughly
-two to five words and at most 40 characters. Normalize it with `naming.py`:
-collapse whitespace; replace `< > : " / \\ | ? *`; remove trailing periods and
-spaces; disallow `.` and `..`; and protect `CON`, `PRN`, `AUX`, `NUL`, `COM1`–
-`COM9`, and `LPT1`–`LPT9`.
+Each accepted option has a 1024×1024 master, exact 29×29, 30×23, and 30×18 PNG
+canvases, and a true ICO with 16, 20, 24, 32, 40, 48, 64, 128, and 256 pixel
+frames. Sources are square; reject non-square art. Resizing is proportional,
+centered, LANCZOS, and uncropped. Background is white by default or transparent
+when requested. Preserve enclosed white foreground when isolating border white.
 
-After acceptance, generate a unique permanent salt of exactly ten lowercase
-letters/digits for each option and reuse it across that option's files.
+Render every PNG and ICO frame from the isolated RGBA artwork before applying
+its final background. Independent ICO frames use the same one-pixel-clear fit as
+previews, then are embedded as PNG bytes without another resize. White frames
+have exact opaque-white corners; transparent frames have zero-alpha corners.
+Do not regenerate artwork for an encoding or background-compositing defect.
+
+## Names and manifests
+
+Normalize a short Title Case summary (normally two to five words, max 40 chars).
+The naming helper handles Windows-invalid characters, whitespace, trailing
+punctuation, and reserved device names. Assign each visually accepted option a
+unique ten-character lowercase-alphanumeric salt; keep it through processing
+retries and reuse it for every file in that option:
 
 ```text
-[summaryName] option [n] [actual width]x[actual height] [salt].png
+[summaryName] option [n] [width]x[height] [salt].png
 [summaryName] option [n] [salt].ico
 ```
 
-## Required files
+The runner stages the complete set outside final output, decodes every ICO frame,
+validates geometry, modes, dimensions, backgrounds, names and salts, then writes
+file hashes plus actual visual-QA evidence in the manifest. Publication refuses
+existing files and rolls back only newly created files on error. Prior icon sets
+are preserved. Use `manifest.json` when available; otherwise the runner writes
+`manifest [run_id].json`. Logs and previews stay in the owned workspace. Do not
+create a ZIP unless requested.
 
-For every accepted option, `process_icons.py` creates:
+## Legacy helpers
 
-- a 1024×1024 source PNG with the selected outer background;
-- exact 29×29, 30×23, and 30×18 PNG canvases with the selected outer background;
-- one true ICO containing 16, 20, 24, 32, 40, 48, 64, 128, and 256 pixel frames.
-
-The script fits proportionally, centers, uses LANCZOS, never stretches, crops,
-or independently redraws derivatives. A different generator size may normalize
-to 1024×1024 only when it is square; reject a non-square source rather than
-distorting it.
-
-The background mode is `white` by default and `transparent` when requested. The
-processor first isolates artwork by removing only border-connected near-white
-source pixels when conservative safety checks pass; this preserves enclosed
-white foreground. It resamples the isolated RGBA artwork before applying the
-final background. White files are saved as opaque RGB with exact-white outer
-corners; transparent files are saved as RGBA with zero-alpha outer corners. ICO
-frames use the same selected background. Foreground integrity takes priority
-over background removal.
-
-Processing uses an OS temporary directory outside the final output directory.
-It validates every staged PNG, the proportional geometry metadata, and every
-required ICO frame before publishing. Publication is rollback-safe: if a
-filesystem error occurs after one final file is moved, files created by that
-attempt are removed and the accepted source is not regenerated. A permission
-failure is an operational staging/publication failure, not a visual QA failure;
-retry the unchanged accepted source only after approved filesystem access is
-available.
-
-Use `--background white` or `--background transparent` on
-`scripts/process_icons.py`. Omitting the option selects white. Record
-`background_mode` in option metadata and `manifest.json`.
-
-## Validation and final directory
-
-Run `validate_icon_assets.py` to confirm each PNG exists, is nonempty, opens as
-PNG, has dimensions matching its filename, has the declared background and
-canvas/mode, is not blank, and retains proportional artwork. Confirm each ICO
-is nonempty, opens as ICO, contains all required frames including a valid
-256×256 frame, uses the declared background, and is not a renamed PNG. Validate
-summary names, option numbers, salt form/reuse/uniqueness, and Windows filename
-safety.
-
-Write accepted files and `manifest.json` directly in the run's current working
-directory. `manifest.json` contains only accepted options and includes run ID,
-request, summary name, skill version, concept mapping, file dimensions, QA
-status, and SHA-256 hashes. The normal result is 25 icon files. Do not leave
-rejected candidates, logs, or transient contact sheets there, and do not create
-a ZIP or mandatory nested output folder.
+`process_icons.py` accepts `--staging-root` outside output. It stages and validates
+one option before publication. `--metadata <FILE>` saves full metadata; stdout is
+a summary unless `--verbose` is requested. `validate_icon_assets.py --manifest`
+prints counts and failures; `--report <FILE>` saves full diagnostics, and
+`--verbose` also prints all checks. Use these helpers only for targeted work.
+Do not patch Python's temporary-directory implementation to redirect staging.

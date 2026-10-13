@@ -379,6 +379,8 @@ def validate_option_assets(metadata: dict[str, Any], base_dir: str | Path = ".")
         if "geometry" in item:
             checks.append(validate_proportional_geometry(item["geometry"]))
     checks.extend(validate_ico(base / ico_file, background_mode))
+    for geometry in metadata.get("ico_geometry", []):
+        checks.append(validate_proportional_geometry(geometry))
     return checks
 
 
@@ -416,6 +418,8 @@ def main() -> int:
     source.add_argument("--manifest", type=Path)
     source.add_argument("--metadata", type=Path, action="append")
     parser.add_argument("--base-dir", type=Path)
+    parser.add_argument("--report", type=Path, help="write the complete diagnostic record to this file")
+    parser.add_argument("--verbose", action="store_true", help="also print every check")
     args = parser.parse_args()
 
     if args.manifest:
@@ -426,7 +430,12 @@ def main() -> int:
         options = [json.loads(path.read_text(encoding="utf-8")) for path in args.metadata]
         base = args.base_dir or Path.cwd()
     checks = validate_package(options, base)
-    print(json.dumps({"qa_status": "FAIL" if has_failures(checks) else "PASS", "checks": checks}, indent=2))
+    document = {"qa_status": "FAIL" if has_failures(checks) else "PASS", "checks": checks}
+    if args.report:
+        args.report.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    summary = {"qa_status": document["qa_status"], "check_count": len(checks),
+               "failures": [check for check in checks if check["result"] == "FAIL"]}
+    print(json.dumps(document if args.verbose else summary, indent=2))
     return 1 if has_failures(checks) else 0
 
 

@@ -25,6 +25,42 @@ For a normal successful request, the skill creates:
 Final files are written directly into the working directory where the icon run
 is performed. The skill does not create a ZIP unless explicitly asked.
 
+## Efficient batch workflow
+
+Version 1.3 uses a recorded run instead of recreating shell glue for every set.
+See [the runtime reference](labview-icon-creator/references/runtime.md) for the
+plan/review schemas and CLI examples.
+
+- Initialize once, resolving a working Python/Pillow and writable work/output locations.
+- Generate independent sources with at most two concurrent calls when supported.
+- Transfer returned data URLs through a tested PTY/stdin receiver, or copy actual local artifacts.
+- Inspect full-size sources and a single sheet whose rendering matches the final assets.
+- Require full functional clarity at 29×29, 30×23, and 30×18; judge dominant meaning at 16×16, allowing secondary-detail loss.
+- Finalize all accepted options in one validated publication, retaining visual evidence and hashes.
+- Retry deterministic errors with unchanged accepted sources; preserve prior deliverables and clean only owned temporary files.
+
+The default work location is OS temp. An explicit `--work-root` outside output
+supports restricted environments. Windows work directories inherit the writable
+parent's access so Python 3.14 mode-0700 ACLs do not exclude the sandbox identity.
+An existing `manifest.json` is preserved; later runs use `manifest <run_id>.json`.
+Compact summaries are printed; complete diagnostics remain in the work directory
+until cleanup. Compact lessons reports preserve observed incidents without
+starting a skill-development task; `--detailed` retains the full report format.
+
+A fresh chat for an unrelated set reduces inherited context; revisions stay in
+the same run. Parallel generation affects elapsed time, not total generation
+usage. No fixed speedup or usage reduction is promised without a live benchmark.
+
+The JavaScript adapter's offline tests use Node.js; generation in Codex uses
+functions.exec and does not require a local Node installation. Run:
+
+```text
+node labview-icon-creator/tests/test_generate_candidates.cjs
+```
+
+On a sandbox that denies OS temp, set TEMP/TMP (Windows) or TMPDIR (POSIX) to an
+allowed test directory before running the Python suite. Do not patch tempfile.
+
 ## Requirements
 
 Install these prerequisites on the destination computer before installing the
@@ -49,8 +85,8 @@ python3 --version
 ```
 
 On native Windows PowerShell, use `git --version` and `py -3 --version`. Windows
-Subsystem for Linux (WSL) is the simplest Windows installation path because the
-skill's runtime commands use `python3`.
+Subsystem for Linux (WSL) is optional. A native or bundled Python interpreter
+is sufficient; the batch runner records and reuses the chosen executable.
 
 ## First-time installation on Linux, macOS, or WSL
 
@@ -152,8 +188,7 @@ description.
 
 ## First-time installation on native Windows PowerShell
 
-WSL is recommended, but a native PowerShell installation can use a directory
-junction. Start PowerShell, choose a permanent parent directory, and run:
+A native PowerShell installation can use a directory junction. Start PowerShell, choose a permanent parent directory, and run:
 
 ```powershell
 git clone https://github.com/joshua-guthrie/labview-icon-creator-skill.git
@@ -180,9 +215,9 @@ py -3 -m unittest discover -s .\labview-icon-creator\tests -v
 ```
 
 Restart Codex if necessary, run `/skills`, and invoke the skill with
-`$labview-icon-creator`. If the runtime reports that `python3` is unavailable,
-use the Linux/macOS instructions inside WSL and start Codex from that WSL
-environment.
+`$labview-icon-creator`. If `python3` is unavailable, use a working `python`,
+`py -3`, or the absolute bundled interpreter path. Do not move to WSL merely
+because one executable alias is missing.
 
 ## Updating an existing installation
 

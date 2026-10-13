@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
-import tempfile
+import shutil
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +15,10 @@ from PIL import Image, ImageChops, ImageDraw
 
 try:
     from .naming import generate_salt, ico_filename, png_filename, sanitize_summary_name
+    from .workspace import temporary_directory
 except ImportError:  # Direct script execution.
     from naming import generate_salt, ico_filename, png_filename, sanitize_summary_name
+    from workspace import temporary_directory
 
 MASTER_SIZE = (1024, 1024)
 PNG_SIZES = ((29, 29), (30, 23), (30, 18))
@@ -120,10 +124,10 @@ def remove_outer_white(image: Image.Image, threshold: int = 238) -> tuple[Image.
     candidates = ImageChops.multiply(bright, neutral)
     width, height = candidates.size
     border_values = []
-    border_values.extend(candidates.crop((0, 0, width, 1)).getdata())
-    border_values.extend(candidates.crop((0, height - 1, width, height)).getdata())
-    border_values.extend(candidates.crop((0, 1, 1, height - 1)).getdata())
-    border_values.extend(candidates.crop((width - 1, 1, width, height - 1)).getdata())
+    for box in ((0, 0, width, 1), (0, height - 1, width, height),
+                (0, 1, 1, height - 1), (width - 1, 1, width, height - 1)):
+        border = candidates.crop(box)
+        border_values.extend(getattr(border, "get_flattened_data", border.getdata)())
     if not border_values or sum(value == 255 for value in border_values) / len(border_values) < 0.75:
         return rgba, False
 
@@ -150,9 +154,31 @@ def remove_outer_white(image: Image.Image, threshold: int = 238) -> tuple[Image.
     return result, True
 
 
-def create_ico(master: Image.Image, destination: Path, background_mode: str) -> None:
-    rendered = apply_background(master, background_mode)
-    rendered.save(destination, format="ICO", sizes=list(ICO_SIZES), bitmap_format="png")
+def create_ico(master: Image.Image, destination: Path, background_mode: str) -> list[dict[str, Any]]:
+    """Encode independently rendered frames; never resample an opaque background.
+
+    Pillow's multi-size encoder resizes an already composited master. Lanczos
+    ringing can then reach a corner and violate the exact background contract.
+    Fit each RGBA frame into its own clear canvas before compositing, matching
+    the 16px QA preview, and store those PNG bytes without another resize.
+    """
+    frames = []
+    geometries = []
+    for size in ICO_SIZES:
+        frame, geometry = fit_artwork(master, size)
+        geometries.append(geometry)
+        encoded = io.BytesIO()
+        apply_background(frame, background_mode).save(encoded, format="PNG")
+        frames.append(encoded.getvalue())
+    offset = 6 + 16 * len(frames)
+    entries = []
+    for (width, height), encoded in zip(ICO_SIZES, frames):
+        entries.append(struct.pack("<BBBBHHII", width % 256, height % 256,
+                                   0, 0, 1, 32, len(encoded), offset))
+        offset += len(encoded)
+    destination.write_bytes(struct.pack("<HHH", 0, 1, len(frames))
+                            + b"".join(entries) + b"".join(frames))
+    return geometries
 
 
 def publish_staged_files(staging: Path, output: Path, names: list[str]) -> None:
@@ -164,12 +190,20 @@ def publish_staged_files(staging: Path, output: Path, names: list[str]) -> None:
     """
 
     published: list[Path] = []
+    if len(names) != len(set(names)) or any(Path(name).name != name for name in names):
+        raise ValueError("publication names must be unique simple filenames")
+    if any((output / name).exists() for name in names):
+        raise FileExistsError("refusing to overwrite existing deliverables")
     try:
         for name in names:
             staged = staging / name
             destination = output / name
-            staged.replace(destination)
+            # Exclusive creation also protects against a collision after the
+            # preflight check and works across OS-temp/output filesystem volumes.
+            stream = destination.open("xb")
             published.append(destination)
+            with stream, staged.open("rb") as source:
+                shutil.copyfileobj(source, stream)
     except Exception:
         for destination in published:
             try:
@@ -187,6 +221,7 @@ def process_icon(
     output_dir: str | Path = ".",
     concept_summary: str = "",
     background_mode: str = DEFAULT_BACKGROUND_MODE,
+    staging_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Process one visually accepted source and return manifest-ready metadata."""
 
@@ -209,14 +244,21 @@ def process_icon(
     # Stage in the OS temporary area rather than beneath output. The final
     # directory may allow file writes while denying creation of nested
     # directories under a managed sandbox.
-    with tempfile.TemporaryDirectory(prefix="labview-icon-process-") as temporary:
+    staging_kwargs = {}
+    if staging_root is not None:
+        stage_parent = Path(staging_root).resolve()
+        if stage_parent == output or output in stage_parent.parents:
+            raise ValueError("staging root must be outside the final output directory")
+        stage_parent.mkdir(parents=True, exist_ok=True)
+        staging_kwargs["dir"] = stage_parent
+    with temporary_directory(prefix="icon-stage-", **staging_kwargs) as temporary:
         staging = Path(temporary)
         apply_background(master_artwork, background_mode).save(staging / source_name, format="PNG", optimize=True)
         for size, name in zip(PNG_SIZES, png_names):
             derivative, geometry = fit_artwork(master_artwork, size)
             apply_background(derivative, background_mode).save(staging / name, format="PNG", optimize=True)
             derivatives.append({"file": name, "dimensions": list(size), "geometry": geometry})
-        create_ico(master_artwork, staging / ico_name, background_mode)
+        ico_geometry = create_ico(master_artwork, staging / ico_name, background_mode)
 
         for name in [source_name, *png_names, ico_name]:
             staged = staging / name
@@ -233,6 +275,7 @@ def process_icon(
             "ico_file": ico_name,
             "ico_sizes": [list(size) for size in ICO_SIZES],
             "ico_background": f"{background_mode}_background",
+            "ico_geometry": ico_geometry,
             "qa_status": "PASS",
         }
         try:
@@ -263,6 +306,8 @@ def main() -> int:
     )
     parser.add_argument("--output-dir", type=Path, default=Path.cwd())
     parser.add_argument("--metadata", type=Path, help="optional JSON metadata destination")
+    parser.add_argument("--staging-root", type=Path, help="writable staging parent outside output")
+    parser.add_argument("--verbose", action="store_true", help="print full metadata instead of a summary")
     args = parser.parse_args()
 
     metadata = process_icon(
@@ -273,11 +318,14 @@ def main() -> int:
         args.output_dir,
         args.concept_summary,
         args.background,
+        args.staging_root,
     )
     encoded = json.dumps(metadata, indent=2)
     if args.metadata:
         args.metadata.write_text(encoded + "\n", encoding="utf-8")
-    print(encoded)
+    print(encoded if args.verbose else json.dumps({"qa_status": "PASS", "option_number": args.option,
+                                                   "metadata": str(args.metadata) if args.metadata else None,
+                                                   "source_file": metadata["source_file"]}))
     return 0
 
 

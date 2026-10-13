@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-import tempfile
 import unittest
 from pathlib import Path
 
 from support import SKILL_ROOT, create_source  # noqa: F401
+from scripts.workspace import temporary_directory
 from scripts.manifest import build_manifest, write_manifest
 from scripts.process_icons import process_icon
 
 
 class ManifestTests(unittest.TestCase):
     def test_manifest_lists_only_accepted_files_with_hashes(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             root = Path(directory)
             accepted = process_icon(create_source(root / "source.png"), "Add Driver", 1, "a1b2c3d4e5", root, "Driver plus")
             rejected = {"qa_status": "FAIL", "source_file": "missing.png"}
@@ -29,7 +29,7 @@ class ManifestTests(unittest.TestCase):
             self.assertEqual(json.loads(destination.read_text())["options"][0]["qa_status"], "PASS")
 
     def test_duplicate_option_salts_are_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             root = Path(directory)
             first = process_icon(create_source(root / "one.png"), "Driver", 1, "a1b2c3d4e5", root)
             second = process_icon(create_source(root / "two.png", variant=2), "Driver", 2, "a1b2c3d4e5", root)

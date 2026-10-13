@@ -12,7 +12,7 @@ from typing import Any, Iterable
 try:
     from . import SKILL_VERSION
 except ImportError:  # Direct script execution.
-    SKILL_VERSION = "1.1.0"
+    from __init__ import SKILL_VERSION
 
 
 def sha256_file(path: str | Path) -> str:
@@ -26,7 +26,8 @@ def sha256_file(path: str | Path) -> str:
 def _accepted_option(option: dict[str, Any], base_dir: Path) -> dict[str, Any]:
     source = str(option["source_file"])
     derivatives = [
-        {"file": str(item["file"]), "dimensions": list(item["dimensions"])}
+        {"file": str(item["file"]), "dimensions": list(item["dimensions"]),
+         **({"geometry": item["geometry"]} if "geometry" in item else {})}
         for item in option["derived_png_files"]
     ]
     ico = str(option["ico_file"])
@@ -47,6 +48,7 @@ def _accepted_option(option: dict[str, Any], base_dir: Path) -> dict[str, Any]:
         "derived_png_files": derivatives,
         "ico_file": ico,
         "ico_background": str(option.get("ico_background", "white_background")),
+        **{key: option[key] for key in ("ico_geometry", "visual_qa", "concept_id", "candidate_id") if key in option},
         "qa_status": "PASS",
         "sha256": hashes,
     }

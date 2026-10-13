@@ -13,9 +13,12 @@ not reduce recognition at small sizes. Avoid decorative border, texture, scene,
 shadow, photographic treatment, or incidental effects.
 Short text is allowed when requested, but treat it as icon geometry: use at
 most three or four large, high-contrast characters, with a simple typeface and
-enough spacing to remain readable at every required output size. Never use
+enough spacing to remain readable at every required PNG size. Never use
 small labels, pseudo-text, or decorative lettering.
 
+Plan essential meaning for the smallest required PNG (30×18) before adding
+secondary detail. At 16×16, preserve the dominant silhouette and primary action;
+secondary-detail loss is acceptable unless the user requires that detail there.
 Build each concept from one dominant idea and normally two or three primary
 elements. Prefer strong silhouettes, thick features, clear separation, and
 industry-standard action/status symbols. Keep essential plus, minus, X, check,
@@ -56,7 +59,8 @@ Concept-preflight rejection is routine planning, not a lessons-learned trigger.
 
 ## Source generation contract
 
-Generate each concept in a separate image-generation call as an independent
+Generate each concept in its own image-generation call (up to two independent
+calls concurrently when supported) as an independent
 full-resolution square raster image, defaulting to 1024×1024. Explicitly request
 one icon only. Do not ask for a grid, sheet, collection, montage, numbered set,
 or multiple alternatives in one image, and never crop such an image into source

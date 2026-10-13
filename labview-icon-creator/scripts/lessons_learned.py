@@ -68,11 +68,11 @@ FAMILY_STRATEGIES = {
             "Full-size appearance is accepted without reviewing every required native-size preview.",
         ],
         "prevention_requirements": [
-            "Design essential cues as large solid geometry with enough separation to survive every required output size.",
+            "Design essential cues to survive all required PNG sizes, retaining dominant meaning at the 16x16 stress size.",
             "Remove secondary detail that competes with the pixels needed by the primary object and action cue.",
         ],
         "detection_requirements": [
-            "Review native 29x29, 30x23, 30x18, and 16x16 previews and record which essential cue changed meaning."
+            "Review native 29x29, 30x23, and 30x18 for full functional meaning and 16x16 for dominant meaning; record the specific essential cue and failed size."
         ],
         "recovery_requirements": [
             "Enlarge or simplify the failed cue, widen required gaps, and regenerate only the affected concept."
@@ -339,11 +339,39 @@ def render_report(failures: list[dict[str, Any]], metadata: dict[str, Any] | Non
     return "\n".join(lines)
 
 
+def render_compact_report(failures: list[dict[str, Any]], metadata: dict[str, Any] | None = None) -> str:
+    """Keep observed incidents and one recovery recommendation per rule family.
+
+    Recommendations are hypotheses for later review, never instructions to
+    mutate the skill or a demand for a development/test cycle during icon work.
+    """
+    metadata = metadata or {}
+    lines = ["# LabVIEW Icon Creator — Lessons Learned", "",
+             f"Run: {metadata.get('run_id', 'Not available')}",
+             f"Skill version: {metadata.get('skill_version', 'Not available')}", "",
+             "## Incident Evidence", ""]
+    for failure in failures:
+        lines.extend([f"- `{_value(failure, 'rule_id')}`; candidate {_value(failure, 'candidate_id')}; "
+                      f"option {_value(failure, 'option_number')}; attempt {_value(failure, 'attempt_number')}; "
+                      f"stage {_value(failure, 'qa_stage')}; size/value {_value(failure, 'measured_value')}: "
+                      f"{_value(failure, 'observed_problem')}",
+                      f"  Correction: {_value(failure, 'corrective_instruction')}. "
+                      f"Outcome: {_value(failure, 'retry_result')}."])
+    lines.extend(["", "## Generalized Lessons", ""])
+    for lesson in generalized_lessons(failures):
+        lines.extend([f"- `{lesson['rule_id']}` ({lesson['occurrences']} occurrence(s)): {lesson['failure_mode']}",
+                      "  Recovery: " + " ".join(lesson["recovery_requirements"])])
+    lines.extend(["", "These are recorded observations and possible improvements for later review. "
+                  "They do not authorize changing this skill during an icon run.", ""])
+    return "\n".join(lines)
+
+
 def write_lessons_learned(
     records: Iterable[dict[str, Any]],
     output_dir: str | Path = ".",
     metadata: dict[str, Any] | None = None,
     salt: str | None = None,
+    compact: bool = True,
 ) -> Path | None:
     failures = qualifying_failures(records)
     if not failures:
@@ -360,7 +388,8 @@ def write_lessons_learned(
     destination = output / f"lessonsLearned {report_salt}.md"
     if destination.exists():
         raise FileExistsError(f"refusing to overwrite lessons-learned report: {destination}")
-    destination.write_text(render_report(failures, metadata), encoding="utf-8")
+    renderer = render_compact_report if compact else render_report
+    destination.write_text(renderer(failures, metadata), encoding="utf-8")
     return destination
 
 
@@ -382,9 +411,11 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=Path.cwd())
     parser.add_argument("--metadata", type=Path, help="optional run metadata JSON")
     parser.add_argument("--salt", help="fixed report salt, primarily for reproducible tests")
+    parser.add_argument("--detailed", action="store_true", help="include a full proposed implementation specification")
     args = parser.parse_args()
     metadata = json.loads(args.metadata.read_text(encoding="utf-8")) if args.metadata else None
-    destination = write_lessons_learned(read_jsonl(args.qa_log), args.output_dir, metadata, args.salt)
+    destination = write_lessons_learned(read_jsonl(args.qa_log), args.output_dir, metadata, args.salt,
+                                      compact=not args.detailed)
     print(destination if destination else "No qualifying failures; no lessons-learned file created.")
     return 0
 

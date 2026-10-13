@@ -1,16 +1,31 @@
 from __future__ import annotations
 
-import tempfile
 import unittest
 from pathlib import Path
 
 from support import SKILL_ROOT  # noqa: F401
+from scripts.workspace import temporary_directory
 from scripts.lessons_learned import generalized_lessons, write_lessons_learned
 
 
 class LessonsLearnedTests(unittest.TestCase):
+    def test_compact_report_retains_specific_incidents_without_development_directive(self) -> None:
+        with temporary_directory() as folder:
+            records = [{"qa_stage": "processing", "rule_id": "FILE-ICO-008", "result": "FAIL",
+                        "candidate_id": "candidate-01", "observed_problem": "20px corner was near-white",
+                        "corrective_instruction": "Re-encode the accepted source"},
+                       {"qa_stage": "processing", "rule_id": "FILE-ICO-008", "result": "FAIL",
+                        "candidate_id": "candidate-02", "observed_problem": "24px frame had opaque alpha"}]
+            path = write_lessons_learned(records, folder)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("20px corner was near-white", text)
+            self.assertIn("24px frame had opaque alpha", text)
+            self.assertEqual(text.count("(2 occurrence(s))"), 1)
+            self.assertNotIn("## Codex Implementation Request", text)
+            self.assertIn("accepted master", text)
+
     def test_no_qualifying_failure_creates_no_file(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             records = [
                 {"qa_stage": "concept_preflight", "result": "FAIL", "rule_id": "CONCEPT-001"},
                 {"qa_stage": "visual", "result": "WARN", "rule_id": "VIS-MARGIN-005"},
@@ -19,7 +34,7 @@ class LessonsLearnedTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_failure_creates_one_complete_actionable_report(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             records = [{
                 "run_id": "run-1",
                 "skill_version": "1.0.0",
@@ -36,7 +51,7 @@ class LessonsLearnedTests(unittest.TestCase):
                 "corrective_instruction": "Use a larger solid plus.",
                 "retry_result": "PASS on attempt 2",
             }]
-            destination = write_lessons_learned(records, directory, {"python_version": "3.x"}, "k7m2p9x4qa")
+            destination = write_lessons_learned(records, directory, {"python_version": "3.x"}, "k7m2p9x4qa", compact=False)
             self.assertEqual(destination.name, "lessonsLearned k7m2p9x4qa.md")
             self.assertEqual(len(list(Path(directory).glob("lessonsLearned *.md"))), 1)
             text = destination.read_text(encoding="utf-8")
